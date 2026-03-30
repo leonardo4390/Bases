@@ -1,0 +1,243 @@
+-- CONSULTAS
+-- 1) Muestre el id, nombre, apellido y dni de los pacientes que no tienen obra social. 
+
+SELECT p.id_paciente, per.nombre, per.apellido, per.dni 
+FROM paciente p
+JOIN persona per ON per.id_persona = p.id_paciente
+LEFT JOIN obra_social o ON o.id_obra_social = p.id_obra_social
+WHERE p.id_obra_social IS NULL;
+
+-- 2) Liste el id, nombre, apellido y sueldo de los empleados, como así también su cargo y especialidad. 
+Ordenado alfabéticamente por cargo, luego por especialidad y en último término por sueldo de mayor a 
+menor. 
+
+SELECT e.id_empleado, p.nombre, p.apellido, e.sueldo, c.cargo, esp.especialidad
+FROM empleado e
+JOIN persona p ON p.id_persona = e.id_empleado
+JOIN cargo c ON c.id_cargo = e.id_cargo
+JOIN especialidad esp ON esp.id_especialidad = e.id_especialidad
+ORDER BY  c.cargo ASC, esp.especialidad ASC, e.sueldo DESC;
+
+-- 3) Liste los pacientes que no tienen obra social y se realizaron al menos un estudio. Debe mostrar el nombre, 
+apellido, dni y nombre del estudio. 
+
+
+
+SELECT p.nombre,
+       p.apellido,
+       p.dni,
+       est.nombre AS estudio
+FROM paciente pac
+JOIN persona p ON pac.id_paciente = p.id_persona
+JOIN estudio_realizado estr ON estr.id_paciente = pac.id_paciente
+JOIN estudio est ON est.id_estudio = estr.id_estudio;
+
+
+
+-- 4) Encuentre los empleados que actualmente se encuentran trabajando, muestre el apellido, nombre, cargo 
+y fecha de inicio del turno vigente (un empleado puede tener muchos turnos a lo largo del tiempo, 
+observe los datos en la tabla trabajan para identificar que turnos tuvo y cual tiene actualmente). Ordene 
+por apellido y nombre. 
+
+SELECT p.apellido, p.nombre, c.cargo, t.turno
+FROM empleado e
+JOIN persona p ON p.id_persona = e.id_empleado
+JOIN cargo c ON c.id_cargo = e.id_cargo
+JOIN trabajan tr ON tr.id_empleado = e.id_empleado
+JOIN turno t ON t.id_turno = tr.id_turno
+WHERE tr.fin IS NULL
+ORDER BY p.apellido, p.nombre;
+
+-- 5) Muestre los empleados que ya no trabajan, es decir, quienes tenían asignado un turno, pero ya no tienen 
+asignado ninguno. 
+
+SELECT e.id_empleado, p.apellido, p.nombre
+FROM empleado e
+JOIN persona p ON p.id_persona = e.id_empleado
+LEFT JOIN trabajan tr ON tr.id_empleado = e.id_empleado
+AND tr.fin IS NULL
+WHERE tr.id_empleado IS NULL;
+
+-- 6) Muestre la cantidad de tratamientos realizados por cada médico de especialidad FISIATRA. Debe mostrar 
+el id, nombre completo del médico y la cantidad de tratamientos, ordenando por cantidad de mayor a 
+menor. 
+
+SELECT m.id_empleado, p.apellido, p.nombre, COUNT(tr.prescribe) AS cantidad_tratamiento
+FROM empleado m
+JOIN persona p ON p.id_persona = m.id_empleado
+JOIN tratamiento tr ON tr.prescribe = m.id_empleado
+JOIN especialidad es ON es.id_especialidad = m.id_especialidad
+WHERE es.especialidad = 'FISIATRA'
+GROUP BY m.id_empleado,p.apellido, p.nombre
+ORDER BY cantidad_tratamiento DESC;
+
+-- 7) Muestre los pacientes de Brasil y Uruguay pero que no sean de las provincias ‘Amazonas’ ni ‘Canelones’. 
+
+SELECT pac.id_paciente, p.apellido, p.nombre
+FROM paciente pac
+JOIN persona p ON p.id_persona = pac.id_paciente
+JOIN ciudad ci ON ci.id_ciudad = p.id_ciudad
+JOIN provincia pro ON pro.id_provincia = ci.id_provincia
+JOIN pais pa ON pa.id_pais = pro.id_pais
+WHERE pa.pais IN ('Brasil','Uruguay')
+AND pro.provincia NOT IN ('Amazonas','Canelones');
+
+-- 8) Liste los laboratorios que no tengan medicamentos asociados. 
+
+SELECT l.id_laboratorio, l.laboratorio
+FROM laboratorio l
+LEFT JOIN medicamento m ON m.id_laboratorio = l.id_laboratorio
+WHERE m.id_laboratorio IS NULL; 
+
+
+-- 9) Muestre los pacientes que tienen obra social, que fueron internados en enero del 2022 en el 8vo piso por 
+una condición psiquiátrica. Ordene los resultados por la fecha de internación.  
+
+SELECT pac.id_paciente, p.apellido, p.nombre, int.fecha_inicio AS fecha_internacion
+FROM paciente pac
+JOIN persona p ON p.id_persona = pac.id_paciente
+JOIN internacion int ON int.id_paciente = pac.id_paciente
+JOIN cama ca ON ca.id_cama = int.id_cama
+JOIN habitacion h ON h.id_habitacion = ca.id_habitacion
+JOIN diagnostico di ON di.id_paciente = pac.id_paciente
+JOIN patologia  pat ON pat.id_patologia = di.id_patologia
+JOIN obra_social ob ON ob.id_obra_social = pac.id_obra_social
+WHERE EXTRACT(YEAR FROM int.fecha_inicio) = 2022
+AND EXTRACT(MONTH FROM int.fecha_inicio) = 1
+AND h.piso = 8
+AND pat.nombre LIKE 'Trastorno%';
+
+
+
+10) Muestre los 5 estudios más realizados, indicando el nombre del estudio y el total de veces que fue 
+realizado. 
+
+SELECT e.nombre, COUNT(er.id_estudio) AS cantidad_estudio_realizados
+FROM estudio e
+JOIN estudio_realizado er ON er.id_estudio = e.id_estudio
+GROUP BY e.nombre
+ORDER BY cantidad_estudio_realizados DESC LIMIT 5;
+
+11) Liste los empleados que no hayan realizado tratamientos en el año 2020, mostrando además su cargo. 
+Ordene los resultados por apellido y nombre. 
+
+SELECT e.id_empleado, p.apellido,p.nombre, c.cargo 
+FROM empleado e
+JOIN persona p ON p.id_persona = e.id_empleado
+JOIN cargo c ON c.id_cargo = e.id_cargo
+LEFT JOIN tratamiento tr ON tr.prescribe = e.id_empleado
+AND EXTRACT(YEAR FROM tr.fecha_indicacion) = 2020
+WHERE tr.prescribe IS NULL
+ORDER BY p.apellido,p.nombre;
+
+
+12) Muestre los pacientes a los que les hayan facturado más que ‘Severo Jover’ desde el 15/05/2022 a la 
+fecha.
+
+
+SELECT pac.id_paciente, p.apellido,p.nombre, SUM(f.monto) AS total
+FROM paciente pac
+JOIN persona p ON p.id_persona = pac.id_paciente
+JOIN factura f ON f.id_paciente = pac.id_paciente
+WHERE f.fecha >= '2022-05-15'
+GROUP BY pac.id_paciente, p.apellido, p.nombre
+HAVING SUM(f.monto) > (
+SELECT SUM(f2.monto)
+FROM paciente pac2
+JOIN persona p2 ON p2.id_persona = pac2.id_paciente
+JOIN factura f2 ON f2.id_paciente = pac2.id_paciente
+WHERE f2.fecha >= '2022-05-15'
+AND p2.nombre = 'Severo'
+AND p2.apellido = 'Jover')
+ORDER BY total DESC;
+
+
+-- 13) Muestre los pacientes que se hayan realizado más estudios que ‘Horacio Palacio’ antes del año 2020. 
+
+SELECT pac.id_paciente, p.apellido, p.nombre, COUNT(er.id_paciente) AS cantidad_estudio
+FROM paciente pac
+JOIN estudio_realizado er ON er.id_paciente = pac.id_paciente
+JOIN persona p ON p.id_persona = pac.id_paciente
+WHERE EXTRACT(YEAR FROM er.fecha) < 2020
+GROUP BY pac.id_paciente, p.apellido,p.nombre
+HAVING COUNT(er.id_paciente) >
+(SELECT COUNT(er2.id_paciente) FROM paciente pac2
+JOIN estudio_realizado er2 ON er2.id_paciente = pac2.id_paciente
+JOIN persona p2 ON p2.id_persona = pac2.id_paciente
+WHERE p2.nombre = 'Horacio'
+AND p2.apellido = 'Palacio')
+ORDER BY cantidad_estudio DESC;
+
+
+-- 14) Muestre (en una sola consulta) el apellido y nombre del paciente, la fecha y precio de todos los 
+tratamientos y estudios que se realizaron el 14/08/2021. 
+
+
+SELECT p.apellido, p.nombre, tr.fecha_indicacion AS fecha, tr.costo AS costo, 'TRATAMIENTO' AS tipo
+FROM  paciente  pac
+JOIN persona p ON p.id_persona = pac.id_paciente
+JOIN tratamiento tr ON tr.id_paciente = pac.id_paciente
+WHERE tr.fecha_indicacion = '2021-08-14'
+
+UNION ALL
+
+SELECT p.apellido, p.nombre, er.fecha AS fecha, er.precio AS costo, 'ESTUDIO' AS tipo
+FROM paciente pac
+JOIN persona p ON p.id_persona = pac.id_paciente
+JOIN estudio_realizado er ON er.id_paciente = pac.id_paciente
+WHERE er.fecha = '2021-08-14'
+ORDER BY fecha, apellido, nombre;
+
+
+-- 15) Modifique el sueldo aumentando un 10% a los empleados cuyo cargo sea FARMACEUTICO. 
+
+UPDATE empleado e
+SET sueldo = sueldo * 1.10
+FROM cargo c
+WHERE e.id_cargo = c.id_cargo
+AND c.cargo = 'FARMACEUTICO';
+
+16) Modifique el campo estado de la tabla cama, con la palabra “EN REPARACION”, de aquellas camas que no 
+se usaron hace más de 1365 días (recalcule usando la fecha de inicio y la del sistema). 
+
+UPDATE cama c
+SET estado = 'EN REPARACION'
+WHERE NOT EXISTS(
+SELECT 1 
+FROM internacion i
+WHERE i.id_cama = c.id_cama
+AND CURRENT_DATE - i.fecha_inicio <= 1365);
+
+
+17) Elimine los estudios que nunca hayan sido realizados por algún paciente.  
+
+DELETE FROM estudio e
+WHERE NOT EXISTS(
+SELECT 1
+FROM estudio_realizado er
+WHERE er.id_estudio = e.id_estudio);
+
+
+
+18) Elimine las compras realizadas entre el 01/03/2009 y 15/03/2009, de los medicamentos cuya clasificación 
+es ‘ENERGETICOS’. 
+
+DELETE FROM compra c
+WHERE c.id_medicamento IN(
+SELECT m.id_medicamento
+FROM medicamento m
+JOIN clasificacion cl ON cl.id_clasificacion = m.id_clasificacion
+WHERE cl.clasificacion = 'ENERGETICOS')
+AND  c.fecha  BETWEEN '2009-03-01' AND '2009-03-15';
+
+
+
+
+
+
+
+
+
+
+
+
