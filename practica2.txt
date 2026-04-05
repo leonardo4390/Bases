@@ -1,0 +1,347 @@
+-- PUNTO 1
+-- a) Ejecute la siguiente consulta: SELECT * FROM consultorio ORDER BY interno 
+
+SELECT *FROM consultorio ORDER BY interno;
+
+-- b) Modifique el número de interno del consultorio GINECOLOGIA y establézcalo en 100. 
+
+UPDATE consultorio
+SET interno = '100'
+WHERE nombre = 'GINECOLOGIA';
+
+-- c) Vuelva a ejecutar la consulta del apartado a. ¿Qué puede observar del resultado obtenido? 
+
+SELECT *FROM consultorio ORDER BY interno;
+
+-- ahora se ha actualizado la columna interno donde su nombre es ginecología, no hay problema ya que obtenemos tipo varchar
+
+-- d) Modifique la dosis del tratamiento del paciente 71387 cuyo medicamento es el 159 y 
+súmele 2 unidades más. Explique lo sucedido.
+
+UPDATE tratamiento
+SET dosis = dosis + 2
+WHERE id_paciente = 71387
+AND id_medicamento = 159;
+
+-- El problema es que tanto interno como dosis están definidos como character varying(texto), pero se están usando para almacenar valores numéricos. 
+-- Al actualizar interno no hay problema porque se guarda como texto pero conceptualmente no es correcto, interno debería ser integer, no texto
+
+-- al intentar sumar  a dosis un numero, se obtiene error carácter varying + integer solución seria castear o directamente modificar la o las tablas
+
+-- e) Modifique el tipo de dato de la columna interno de la tabla consultorio cambiándolo a 
+integer.  
+
+ALTER TABLE consultorio
+ALTER COLUMN interno TYPE integer
+USING interno::integer;
+
+-- - USING interno::integer → convierte los valores actuales (que están como texto) a enteros.
+
+
+-- f) Modifique el tipo de dato de la columna dosis de la tabla tratamiento cambiándolo a 
+smallint.
+
+ALTER TABLE tratamiento
+ALTER COLUMN dosis TYPE smallint
+USING dosis::smallint;
+
+
+-- PUNTO 2
+
+-- a) ¿En la tabla consulta es mejor tener un índice por fecha y resultado o por resultado y 
+fecha? Justifique. 
+
+-- se aprovecha mejor cuando las consultas filtran primero por la columna líder
+-- - se optimiza cuando buscás por fecha sola o por fecha + resultado.
+-- - se optimiza cuando buscás por resultado solo o por resultado + fecha.
+-- Ejemplo práctico en la tabla
+-- - “Dame todas las consultas del 14/08/2021” → Filtra por fecha. - → Conviene índice (fecha, resultado).
+
+-- - “Dame todas las consultas cuyo resultado sea ‘POSITIVO’” → Filtra por resultado. - → Conviene índice (resultado, fecha)
+
+-- - “Dame todas las consultas del 14/08/2021 con resultado ‘POSITIVO’”
+→ Filtra por fecha + resultado.
+→ Ambos índices sirven, pero el orden de la columna líder determina cuál se aprovecha mejor.
+
+
+--  b) Se necesita consultar los pacientes internados de la tercera edad, es decir, mayores a 65 
+años. ¿Crearía índices? Justifique.
+
+-- Normalmente la edad no está almacenada directamente, sino que se calcula a partir de la fecha de nacimiento del paciente:
+
+SELECT *
+FROM paciente
+WHERE AGE(CURRENT_DATE, fecha_nacimiento) > INTERVAL '65 years';
+
+-- En PostgreSQL, cuando aplicás una función sobre una columna, el índice tradicional sobre esa columna no se aprovecha.
+-- Si consultás con una condición directa como:
+SELECT *
+FROM persona
+WHERE fecha_nacimiento <= CURRENT_DATE - INTERVAL '65 years'
+
+-- - entonces sí se puede usar un índice normal en fecha_nacimiento. Esto es lo más recomendable.
+-- - ndice funcional
+- Podés crear un índice sobre la expresión que usás en la consulta:
+
+CREATE INDEX idx_persona_pacientes_mayores65
+ON persona(fecha_nacimiento)
+WHERE fecha_nacimiento <= CURRENT_DATE - INTERVAL '65 years'
+  AND id_persona IN (SELECT id_paciente FROM paciente);
+
+
+-- c) ¿En la tabla habitación sería mejor tener un índice por piso y número o por número y piso? 
+
+-- La decisión sobre el orden de columnas en un índice compuesto en la tabla habitación depende de cómo se hacen las consultas más frecuentes:
+-- - Mejor índice: (piso, numero), porque refleja el patrón de consultas más habitual (filtrar por piso y luego por número).
+
+ CREATE INDEX idx_habitacion_piso_numero
+ON habitacion(piso, numero);
+
+d) ¿Crearía un índice en la tabla laboratorio? Justifique. 
+
+-- no es necesario crear un índice.
+-- - Tamaño reducido: con tan pocas filas, PostgreSQL puede recorrer la tabla completa con un sequential scan en milisegundos. El costo de mantener un índice (espacio en disco y actualizaciones en cada INSERT/UPDATE/DELETE) sería mayor que el beneficio.
+- Índices son útiles en tablas grandes: cuando la cantidad de registros supera miles o millones, el índice reduce drásticamente el tiempo de búsqueda.
+- Optimización natural: en tablas pequeñas, el optimizador de PostgreSQL suele preferir un escaneo secuencial porque es más rápido que saltar al índice y luego acceder a las filas.
+
+Cuándo sí convendría
+- Si la tabla laboratorio creciera mucho en el futuro (ej. decenas de miles de registros).
+- Si se realizan consultas muy frecuentes y específicas sobre una columna (ej. WHERE nombre_laboratorio = 'Bioquímica').
+- Si se necesita garantizar unicidad en algún campo (ej. código de laboratorio), en cuyo caso se usaría un índice único.
+
+
+
+e) Si necesito ver todos los diagnósticos de un determinado paciente, ¿cómo crearía el 
+índice? 
+
+SELECT *
+FROM diagnostico
+WHERE id_paciente = 71387;
+
+-- - Sin índice, PostgreSQL haría un sequential scan sobre miles de filas, lo que es costoso.
+
+CREATE INDEX idx_diagnostico_paciente
+ON diagnostico(id_paciente);
+
+-- veo con explain
+
+EXPLAIN ANALYZE SELECT *
+FROM diagnostico
+WHERE id_paciente = 71387;
+
+f) Si necesito ver las facturas cuyo saldo es superior a 100.000, ¿cómo crearía el índice? 
+
+SELECT *
+FROM factura
+WHERE saldo > 100000;
+
+CREATE INDEX idx_factura_saldo
+ON factura(saldo);
+
+-- Si la mayoría de las facturas tienen saldo menor a 100.000 y solo unas pocas superan ese valor, un índice parcial es más eficiente:
+CREATE INDEX idx_factura_saldo_alto
+ON factura(saldo)
+WHERE saldo > 100000;
+
+
+- Este índice solo guarda las filas que cumplen la condición.
+- Reduce espacio y mantenimiento, porque no indexa todas las facturas, solo las relevantes.
+- Ideal si la consulta “facturas con saldo > 100.000” es muy frecuente.
+
+g) Si necesito ver todos los empleados de cargo SECRETARIA. ¿Crearía índices? Justifique. 
+
+-- - No conviene crear un índice en cargo en este caso.
+- Justificación: la tabla es pequeña y el índice no aporta mejoras significativas; PostgreSQL resolverá rápido con escaneo secuencial.
+- Solo sería útil si la tabla creciera mucho en el futuro (decenas de miles de empleados) o si las consultas por cargo fueran extremadamente frecuentes y críticas en rendimiento.
+
+h) Se necesita listar todos los estudios realizados en el año 2021. ¿Crearía índices? Justifique. 
+
+-- la consulta seria 
+SELECT *
+FROM estudio_realizado
+WHERE fecha BETWEEN '2021-01-01' AND '2021-12-31';
+
+-- - Con 300 mil filas, un escaneo secuencial sería costoso.
+- Un índice sobre la columna de fecha permite que PostgreSQL localice rápidamente las filas del año 2021.
+
+ Opciones de índices
+1. Índice simple en fecha
+CREATE INDEX idx_estudio_fecha
+ON estudio_realizado(fecha);
+
+
+- PostgreSQL puede usarlo para cualquier consulta que filtre por rango de fechas.
+- Es útil si consultás por distintos años o períodos.
+
+-- Índice parcial (solo 2021)
+CREATE INDEX idx_estudio_2021
+ON estudio_realizado(fecha)
+WHERE fecha BETWEEN '2021-01-01' AND '2021-12-31';
+
+
+- Este índice solo guarda las filas del año 2021.
+- Es más eficiente en espacio y mantenimiento si solo consultás ese año de manera recurrente.
+- Pero si también consultás otros años, el índice simple en fecha es más flexible.
+
+
+-- PUNTO 3
+a) Obtenga el tiempo de planeamiento y ejecución de la consulta SQL que permita encontrar 
+todas las facturas adeudadas del primer semestre del 2021. 
+
+EXPLAIN ANALYZE
+SELECT *
+FROM factura
+WHERE pagada = 'N'
+  AND fecha BETWEEN '2021-01-01' AND '2021-06-30';
+
+b) Cree el índice que considere necesario para mejorar el tiempo de ejecución de la consulta 
+del apartado anterior. 
+
+CREATE INDEX idx_factura_pagada_fecha
+ON factura(pagada, fecha);
+
+-- Justificación
+- Columna pagada: discrimina rápidamente entre facturas pagadas y no pagadas.
+- Columna fecha: permite filtrar por rango de fechas (primer semestre de 2021).
+- Al combinar ambas columnas en un índice compuesto, PostgreSQL puede localizar directamente las facturas adeudadas en ese período sin recorrer cientos de miles de filas.
+
+
+
+
+
+c) Ejecute nuevamente la consulta del apartado a para ver que tanto mejoró el tiempo de 
+ejecución. Exprese el tiempo de mejora en porcentaje. 
+EXPLAIN ANALYZE
+SELECT *
+FROM factura
+WHERE pagada = 'N'
+  AND fecha BETWEEN '2021-01-01' AND '2021-06-30';
+
+d) Muestre el tamaño de la tabla factura y el tamaño de sus índices. 
+-- 1. Tamaño total de la tabla (incluye datos, índices y TOAST)
+
+SELECT pg_size_pretty(pg_total_relation_size('factura')) AS total;
+
+-- 2. Tamaño solo de la tabla (sin índices)
+
+SELECT pg_size_pretty(pg_relation_size('factura')) AS tabla;
+
+-- tamaño de todos los índices
+
+SELECT pg_size_pretty(pg_indexes_size('factura')) AS indices;
+
+e) Para facilitar las búsquedas cree los índices necesarios en toda la base de datos Hospital 
+(analice minuciosamente el o los campos por los cuales considera que se realizarán las 
+búsquedas). 
+
+---
+
+ Propuesta de índices por tabla
+
+| Tabla                | Campo(s) recomendado(s) | Justificación |
+|-----------------------|--------------------------|---------------|
+| **paciente**          | `dni`, `id_persona`     | Búsquedas por documento o relación con persona. |
+| **persona**           | `apellido`, `nombre`    | Consultas por nombre/apellido. |
+| **empleado**          | `id_cargo`, `id_consultorio` | Se usa en joins y filtros por cargo. |
+| **cargo**             | ninguno (tabla pequeña) | Menos de 500 filas, escaneo secuencial es suficiente. |
+| **consulta**          | `id_paciente`, `fecha`  | Consultas por paciente y rango de fechas. |
+| **diagnostico**       | `id_paciente`, `id_consulta` | Listar diagnósticos de un paciente. |
+| **estudio_realizado** | `id_paciente`, `fecha`  | Más de 300k filas, consultas por paciente y año. |
+| **factura**           | `pagada, fecha` (compuesto) | Optimiza facturas adeudadas por rango de fechas. |
+| **pago**              | `id_factura`            | Relación directa con facturas. |
+| **internacion**       | `id_paciente`, `id_habitacion` | Consultas por paciente y habitación. |
+| **habitacion**        | `id_cama`               | Relación con camas. |
+| **cama**              | `id_habitacion`         | Relación directa. |
+| **laboratorio**       | ninguno (tabla <200 filas) | No justifica índice. |
+| **medicamento**       | `nombre`                | Búsquedas por nombre de medicamento. |
+| **tratamiento**       | `id_paciente`, `id_medico` | Consultas por paciente y médico. |
+| **turno**             | `id_paciente`, `fecha`  | Consultas por paciente y fecha de turno. |
+| **proveedor**         | `nombre`                | Búsquedas por nombre de proveedor. |
+| **compra**            | `id_proveedor`, `fecha` | Consultas por proveedor y rango de fechas. |
+
+---
+--- ejemplo buscar paciente por dni
+
+SELECT pa.id_paciente, pe.nombre, pe.apellido, pe.dni
+FROM paciente pa
+JOIN persona pe ON pa.id_persona = pe.id_persona
+WHERE pe.dni = '12345678';
+
+-- Índice en persona para búsquedas por DNI
+CREATE INDEX idx_persona_dni ON persona(dni);
+
+-- Índice en paciente para acelerar el JOIN con persona
+CREATE INDEX idx_paciente_persona ON paciente(id_persona);
+
+-- Paciente: búsquedas por DNI y relación con persona
+CREATE INDEX idx_paciente_dni ON paciente(dni);
+CREATE INDEX idx_paciente_persona ON paciente(id_persona);
+
+-- Persona: búsquedas por apellido y nombre
+CREATE INDEX idx_persona_apellido ON persona(apellido);
+CREATE INDEX idx_persona_nombre ON persona(nombre);
+
+-- Empleado: consultas por cargo y consultorio
+CREATE INDEX idx_empleado_cargo ON empleado(id_cargo);
+CREATE INDEX idx_empleado_consultorio ON empleado(id_consultorio);
+
+-- Consulta: búsquedas por paciente y fecha
+CREATE INDEX idx_consulta_paciente ON consulta(id_paciente);
+CREATE INDEX idx_consulta_fecha ON consulta(fecha);
+
+-- Diagnóstico: listar diagnósticos de un paciente
+CREATE INDEX idx_diagnostico_paciente ON diagnostico(id_paciente);
+CREATE INDEX idx_diagnostico_consulta ON diagnostico(id_consulta);
+
+-- Estudio realizado: consultas por paciente y año
+CREATE INDEX idx_estudio_realizado_paciente ON estudio_realizado(id_paciente);
+CREATE INDEX idx_estudio_realizado_fecha ON estudio_realizado(fecha);
+
+-- Factura: facturas adeudadas por rango de fechas
+CREATE INDEX idx_factura_pagada_fecha ON factura(pagada, fecha);
+
+-- Pago: relación directa con facturas
+CREATE INDEX idx_pago_factura ON pago(id_factura);
+
+-- Internación: consultas por paciente y habitación
+CREATE INDEX idx_internacion_paciente ON internacion(id_paciente);
+CREATE INDEX idx_internacion_habitacion ON internacion(id_habitacion);
+
+-- Habitacion y cama: relaciones directas
+CREATE INDEX idx_habitacion_cama ON habitacion(id_cama);
+CREATE INDEX idx_cama_habitacion ON cama(id_habitacion);
+
+-- Medicamento: búsquedas por nombre
+CREATE INDEX idx_medicamento_nombre ON medicamento(nombre);
+
+-- Tratamiento: consultas por paciente y médico
+CREATE INDEX idx_tratamiento_paciente ON tratamiento(id_paciente);
+CREATE INDEX idx_tratamiento_medico ON tratamiento(id_medico);
+
+-- Turno: consultas por paciente y fecha
+CREATE INDEX idx_turno_paciente ON turno(id_paciente);
+CREATE INDEX idx_turno_fecha ON turno(fecha);
+
+-- Proveedor: búsquedas por nombre
+CREATE INDEX idx_proveedor_nombre ON proveedor(nombre);
+
+-- Compra: consultas por proveedor y fecha
+CREATE INDEX idx_compra_proveedor ON compra(id_proveedor);
+CREATE INDEX idx_compra_fecha ON compra(fecha);
+
+
+
+-- PUNTO 4
+Dado el siguiente modelo relacional que registra las ayudas sociales que reciben los ciudadanos 
+llevando registro de relevamiento ambiental y el grupo familiar al que pertenecen, realice: 
+a) Analice cuidadosamente el tipo de dato para cada campo y elija adecuadamente el tipo de 
+cada uno de ellos.  
+b) Analice el o los campos por los cuales considera que se realizarán las búsquedas y proponga 
+la creación de los índices necesarios.  
+
+
+
+
+
+
+ 
