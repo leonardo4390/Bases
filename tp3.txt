@@ -1,0 +1,303 @@
+-- Ejercicio nro. 1:
+-- Informes
+-- Solo lectura
+-- Grupo para area de informe 
+CREATE ROL perezj_informes;
+
+-- Usuario
+CREATE USER perezj_userinformes WITH PASSWORD '1234';
+
+-- Asignar Rol
+GRANT perezj_informes TO perezj_userinformes;
+
+-- poder usar esquemas publicos
+GRANT USAGE ON SCHEMA public TO perezj_informes;
+
+-- a) Mostrar datos de los pacientes, si tiene obra social, también el nombre de la misma.
+
+GRANT SELECT ON paciente TO perezj_informes;
+GRANT SELECT ON obra_social TO perezj_informes;
+
+-- b) Mostrar las consultas a las que asistió el paciente, también debe mostrar el medico que lo atendió, en que consultorio, el diagnóstico y la patología detectada.
+
+GRANT SELECT ON consulta TO perezj_informes;
+GRANT SELECT ON empleado TO perezj_informes;
+GRANT SELECT ON consultorio TO perezj_informes;
+GRANT SELECT ON diagnostico TO perezj_informes;
+GRANT SELECT ON patologia TO perezj_informes;
+
+
+c) Mostrar las internaciones que tuvo el paciente, debe mostrar la habitación y la cama en la que estuvo.
+
+GRANT SELECT ON internacion TO perezj_informes;
+GRANT SELECT ON habitacion TO perezj_informes;
+GRANT SELECT ON cama TO perezj_informes;
+
+d) Mostrar los estudios que le realizaron, los equipos que se utilizaron y el profesional que le realizo el
+estudio.
+
+GRANT SELECT ON estudio_realizado TO perezj_informes;
+GRANT SELECT ON equipo TO perezj_informes;
+GRANT SELECT
+
+Admisión
+
+-- Grupo para area de admision
+CREATE ROL perezj_admision;
+
+-- Usuario
+CRETE USER perezj_useradmision WITH PASSWORD '1234';
+
+-- Asignar Rol
+GRANT perezj_admision TO perezj_useradmision;
+GRANT USAGE ON SCHEMA public TO perezj_admision;
+
+-- a) Agregar, modificar o eliminar un paciente.
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON paciente TO perezj_admision;
+
+-- b) Listar consultas y agregar consultas.
+
+GRANT SELECT, INSERT ON consulta TO perezj_admision;
+
+-- c) Listar y agregar estudios realizados.
+
+GRANT SELECT, INSERT ON estudio_realizado TO perezj_admision;
+
+-- d) Listar, agregar, modificar internaciones.
+
+GRANTI SELECT, INSERT, UPDATE ON internacion TO perezj_admision;
+
+-- RRHH
+
+-- Rol
+CREATE ROL perezj_rrhh;
+
+-- Usuario
+CREATE USER perezj_userrrhh WITH PASSWORD '1234';
+
+-- Asignar Rol 
+GRANT perezj_rrhh TO perezj_userrrhh;
+
+GRANT USAGE ON SCHEMA public TO perezj_rrhh;
+
+-- a) Agregar, modificar o eliminar empleados.
+
+GRANT INSERT, UPDATE, DELETE ON empleado TO perezj_rrhh;
+
+-- b) Modificar los datos de los empleados, especialidad, cargo, horarios que cumplen.
+
+GRANT UPDATE ON empleado TO perezj_rrhh;
+GRANT UPDATE ON especialidad TO perezj_rrhh;
+GRANT UPDATE ON cargo TO perezj_rrhh;
+GRANT UPDATE ON turno TO perezj_rrhh;
+
+-- Médicos
+
+-- Rol Grupo
+CREATE ROL perezj_medicos;
+
+-- Usuario
+CREATE USER perezj_usermedicos WITH PASSWORD '1234';
+
+-- Asignar Rol
+GRANT perezj_medicos TO perezj_usermedicos;
+
+GRANT USAGE ON SCHEMA public TO  perezj_medicos;
+
+-- a) Agregar consultas.
+
+GRANT UPDATE ON consulta TO perezj_medicos;
+
+-- b) Agregar, modificar o eliminar tratamientos.
+
+GRANT INSERT, UPDATE, DELETE ON tratamiento TO perezj_medicos;
+
+-- c) Agregar, modificar o eliminar diagnósticos.
+
+GRANT INSERT, UPDATE, DELETE ON diagnostico TO perezj_medicos;
+
+-- d) Agregar, modificar o eliminar estudios realizados.
+
+GRANT INSERT, UPDATE, DELETE ON estudio_realizado TO perezj_medicos;
+
+-- e) Puede realizar todas las consultas que se realizan en Informes y Admisión
+
+GRANT perezj_informes TO perezj_medicos;
+GRANT perezj_admision TO perezj_medicos;
+
+-- Compras
+
+-- Rol Grupos
+CREATE ROL perezj_compras;
+
+-- Usuario
+CRETE USER perezj_usercompras WITH PASSWORD '1234';
+
+-- Asignar Roles
+GRANT perezj_compras TO perezj_usercompras;
+
+GRANT USAGE ON SCHEMA public TO perezj_compras;
+
+-- a) Listar compras, mostrando proveedores, clasificación y laboratorio de cada insumo adquirido.
+
+GRANT SELECT ON compra TO perezj_compras;
+GRANT SELECT ON proveedor TO perezj_compras;
+GRANT SELECT ON clasificacion TO perezj_compras;
+GRANT SELECT ON laboratorio TO perezj_compras;
+
+-- b) Agregar y modificar compras.
+
+GRANT SELECT,INSERT, UPDATE ON compra TO perezj_compras;
+
+-- c) Agregar laboratorios, clasificaciones, proveedores y medicamentos.
+
+GRANT SELECT,INSERT ON laboratorio, clasificacion, proveedor, medicamento TO perezj_compras;
+
+-- d) Modificar laboratorios, clasificaciones, proveedores y medicamentos.
+GRANT SELECT,UPDATE ON laboratorio, clasificaion, proveedor, medicamento TO perezj_compras;
+
+-- e) Eliminar laboratorios, clasificaciones, proveedores y medicamentos.
+GRANT SELECT, DELETE ON laboratorio, clasificacion, proveedor, medicamento TO perezj_compras;
+
+-- Facturación
+
+-- Rol Grupos
+CREATE ROL perezj_facturacion;
+
+-- Usuario
+CREATE USER perezj_userfacturacion WITH PASSWORD '1234';
+
+-- Asignar Rol
+GRANT perezj_facturacion TO perezj_userfacturacion;
+
+GRANT USAGE ON SCHEMA public TO perezj_facturacion;
+
+-- a) Listar las facturas, mostrando los pacientes.
+
+GRANT SELECT ON factura, paciente TO perezj_facturacion;
+
+-- b) Agregar, modificar y eliminar facturas.
+
+GRANT SELECT ON persona TO perezj_facturacion;
+GRANT SELECT, INSERT, UPDATE, DELETE ON factura TO perezj_facturacion;
+
+-- c) Listar los pagos, mostrando el paciente.
+
+GRANT SELECT ON pago TO perezj_facturacion;
+
+-- d) Agregar modificar y eliminar pagos.
+
+GRANT UPDATE, DELETE ON pago TO perezj_facturacion;
+
+-- Mantenimiento
+
+-- Rol Grupo
+CREATE ROL perezj_mantenimiento;
+
+-- Usuario
+CREATE USER perezj_usermantenimiento WITH PASSWORD '1234';
+
+-- Asignar Rol
+
+GRANT perezj_mantenimiento TO perezj_usermantenimiento;
+
+GRANT USAGE ON SCHEMA public TO perezj_mantenimiento;
+
+
+-- a) Listar los equipos y el estado de los mismos.
+
+GRANT SELECT ON equipo, mantenimiento_equipo TO perezj_mantenimiento;
+
+-- b) Listar las camas y el estado de las mismas.
+
+GRANT SELECT ON cama, mantenimiento_cama TO perezj_mantenimiento;
+
+-- c) Agregar nuevos equipos y camas.
+
+GRANT INSERT ON equipo, cama TO perezj_mantenimiento;
+
+-- d) Asignar empleados en mantenimientos de equipos y camas.
+GRANT SELECT ON persona TO perezj_mantenimiento;
+GRANT SELECT ON empleado TO perezj_mantenimiento;
+GRANT SELECT, INSERT ON  equipo, cama TO perezj_mantenimiento;
+
+-- Sistemas
+
+-- Rol Grupo
+CREATE ROL perezj_sistemas;
+
+-- Usuario
+CREATE USER perezj_usersistemas WITH PASSWORD '1234';
+
+-- Asignar Rol
+GRANT perezj_sistemas TO perezj_usersistemas;
+
+GRANT USAGE ON SCHEMA public TO perezj_sistemas;
+
+-- a) Agregar, modificar o eliminar estudios.
+GRANT SELECT, INSERT, UPDATE, DELETE ON estudio TO perezj_sistemas;
+
+-- b) Agregar, modificar o eliminar cargos.
+GRANT SELECT, INSERT, UPDATE, DELETE ON cargo TO perezj_sistemas;
+
+-- c) Agregar, modificar o eliminar especialidades.
+GRANT SELECT, INSERT, UPDATE, DELETE ON especialidad TO perezj_sistemas;
+
+-- d) Agregar, modificar o eliminar tipos de estudios.
+GRANT SELECT, INSERT, UPDATE, DELETE ON tipo_estudio TO perezj_sistemas;
+
+-- e) Agregar, modificar o eliminar consultorios.
+GRANT SELECT, INSERT, UPDATE, DELETE ON consultorio TO perezj_sistemas;
+
+-- f) Agregar, modificar o eliminar obras sociales.
+GRANT SELECT, INSERT, UPDATE, DELETE ON obra_social TO perezj_sistemas;
+
+-- g) Agregar, modificar o eliminar turnos.
+GRANT SELECT, INSERT, UPDATE, DELETE ON turno TO perezj_sistemas;
+
+-- h) Listar todas las tablas antes mencionadas.
+
+-- usuario equis
+-- a) Cree un usuario de nombre “equis” y asígnele los permisos del grupo Admisión, Médicos y Mantenimiento.
+
+-- Usuario equis
+CREATE USER equis WITH PASSWORD '1234';
+
+-- Asignar Roles
+
+GRANT perezj_admision TO equis;
+GRANT perezj_medicos TO equis;
+GRANT perezj_mantenimiento TO equis;
+
+b) Mediante una consulte muestre TODOS los permisos que tiene el usuario “equis” sobre todas las tablas
+
+SELECT grantee, table_name, privilege_type
+FROM information_schema.role_table_grants
+WHERE grantee = 'equis';
+
+Ejercicio nro. 2:
+a) Muestre el nombre, apellido y la obra social de todos los pacientes (incluso de aquellos que no tienen
+obra social).
+b) Liste el nombre, apellido, especialidad y sueldo de todos los empleados que trabajan por la Noche.
+c) Mostrar los tratamientos cuyo número de dosis sea mayor que 4, es decir, el nombre del
+medicamento, presentación, clasificación y descripción del tratamiento.
+d) Mostrar todas las facturas que han sido pagadas parcialmente.
+e) Mostrar todos los pagos realizados por “Sara Rosell”.
+f) Mostrar la historia clínica de la paciente “Luna Giralt” (todas las consultas, tratamientos, estudios,
+internaciones). Ordene los resultados por fecha. El resultado se debe mostrar de la siguiente manera:
+g) Agregar un nuevo Laboratorio (206, “LABUNT”, “AV. INDEPENDENCIA 1800”, “54-381-123-4444”).
+h) Ingresar un equipo a mantenimiento (43, “2021-09-28”, “A la espera de repuestos”, “En reparacion”,
+null, 26, 460).
+i) El empleado “Santiago Serna” pasa de trabajar por la Mañana a trabajar por la Tarde.
+j) Eliminar al proveedor “BIOPLIX”.
+
+Ejercicio nro. 3:
+Implemente la seguridad a través de esquemas, para ello:
+a) Cree un nuevo esquema en la base de datos Hospital, con el nombre de “facturacion”.
+b) Mueva las tablas pago y factura al nuevo esquema “facturacion” (lo puede hacer desde la pestaña
+general de las propiedades de tabla).
+c) Conéctese al servidor con el usuario de facturación y realice nuevamente la consulta E. Explique si la
+pudo ejecutar y cómo lo hizo.
+
+
