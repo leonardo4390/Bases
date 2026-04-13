@@ -1,0 +1,455 @@
+Ejercicio nro. 1:  
+Analice la base de datos y cree los grupos necesarios y un usuario por grupo (a los usuarios y grupos anteponga 
+su apellido, inicial de nombre y un guion bajo: perezj_) para cada área del Hospital y asigne los permisos 
+mínimos para poder llevar a cabo las tareas que cada uno de ellos debe realizar. Deberá crear usuarios para 
+realizar las siguientes tareas: 
+Informes 
+
+-- Solo lectura
+-- Grupo para área de Informes (solo lectura)
+CREATE ROLE perezj_informes;
+
+-- Crear usuario
+CREATE USER perezj_userinformes WITH PASSWORD '1234';
+
+-- Asignar rol
+GRANT perezj_informes TO perezj_userinformes;
+
+-- Poder usar esquemas publicos
+GRANT USAGE ON SCHEMA public TO perezj_informes;
+
+
+a) Mostrar datos de los pacientes, si tiene obra social, también el nombre de la misma. 
+
+GRANT SELECT ON paciente TO perezj_informes;
+GRANT SELECT ON obra_social TO perezj_informes;
+
+SELECT p.nombre, p.apellido, os.nombre AS obra_social
+FROM paciente pa
+JOIN persona p ON p.id_persona = pa.id_paciente
+LEFT JOIN obra_social os ON pa.id_obra_social = os.id_obra_social;
+
+
+b) Mostrar las consultas a las que asistió el paciente, también debe mostrar el medico que lo atendió, en que consultorio, el diagnóstico y la patología detectada. 
+
+GRANT SELECT ON consulta TO perezj_informes;
+GRANT SELECT ON empleado TO perezj_informes;
+GRANT SELECT ON consultorio TO perezj_informes;
+GRANT SELECT ON diagnostico TO perezj_informes;
+GRANT SELECT ON patologia TO perezj_informes;
+
+
+SELECT pa.id_paciente,
+       p.nombre AS nombre_paciente,
+       p.apellido AS apellido_paciente,
+       c.fecha AS fecha_consulta,
+       per_med.nombre AS nombre_medico,
+       per_med.apellido AS apellido_medico,
+       cons.nombre AS consultorio,
+       d.descripcion AS diagnostico,
+       pat.nombre AS patologia
+FROM consulta c
+JOIN paciente pa ON c.id_paciente = pa.id_paciente
+JOIN persona p ON pa.id_paciente = p.id_persona
+JOIN empleado e ON c.id_empleado = e.id_empleado
+JOIN persona per_med ON e.id_persona = per_med.id_persona
+JOIN consultorio cons ON c.id_consultorio = cons.id_consultorio
+JOIN diagnostico d ON c.id_consulta = d.id_consulta
+JOIN patologia pat ON d.id_patologia = pat.id_patologia
+WHERE p.nombre = 'Luna' AND p.apellido = 'Giralt'
+ORDER BY c.fecha;
+
+c) Mostrar las internaciones que tuvo el paciente, debe mostrar la habitación y la cama en la que estuvo. 
+
+
+GRANT SELECT ON internacion TO perezj_informes;
+GRANT SELECT ON habitacion TO perezj_informes;
+GRANT SELECT ON cama TO perezj_informes;
+
+SELECT pe.nombre AS nombre_paciente,
+       pe.apellido AS apellido_paciente,
+       i.fecha_ingreso,
+       i.fecha_alta,
+       h.numero AS habitacion,
+       c.numero AS cama
+FROM internacion i
+JOIN paciente pa ON i.id_paciente = pa.id_paciente
+JOIN persona pe ON pa.id_persona = pe.id_persona
+JOIN habitacion h ON i.id_habitacion = h.id_habitacion
+JOIN cama c ON i.id_cama = c.id_cama
+WHERE pe.nombre = 'Luna' AND pe.apellido = 'Giralt'
+ORDER BY i.fecha_ingreso;
+
+
+
+d) Mostrar los estudios que le realizaron, los equipos que se utilizaron y el profesional que le realizo el estudio. 
+
+GRANT SELECT ON estudio_realizado TO perezj_informes;
+GRANT SELECT ON estudio TO perezj_informes;
+GRANT SELECT ON equipo TO perezj_informes;
+
+SELECT pe.nombre AS nombre_paciente,
+       pe.apellido AS apellido_paciente,
+       er.fecha,
+       te.nombre AS tipo_estudio,
+       eq.nombre AS equipo,
+       per_prof.nombre AS nombre_profesional,
+       per_prof.apellido AS apellido_profesional
+FROM estudio_realizado er
+JOIN paciente pa ON er.id_paciente = pa.id_paciente
+JOIN persona pe ON pa.id_persona = pe.id_persona
+JOIN tipo_estudio te ON er.id_tipo_estudio = te.id_tipo_estudio
+JOIN equipo eq ON er.id_equipo = eq.id_equipo
+JOIN empleado em ON er.id_empleado = em.id_empleado
+JOIN persona per_prof ON em.id_persona = per_prof.id_persona
+WHERE pe.nombre = 'Luna' AND pe.apellido = 'Giralt'
+ORDER BY er.fecha;
+
+
+
+Admisión 
+
+-- Rol
+CREATE ROLE perezj_admision;
+
+-- Usuarios
+CREATE ROLE perezj_admision;
+
+-- Permisos
+
+GRANT USAGE ON SCHEMA public TO perezj_admision;
+
+-- Paciente
+GRANT SELECT, INSERT, UPDATE, DELETE ON paciente TO perezj_admision;
+
+-- Consultas
+GRANT SELECT, INSERT ON consulta TO perezj_admision;
+
+-- Estudios realizados
+GRANT SELECT, INSERT ON estudio_realizado TO perezj_admision;
+
+-- Internaciones
+GRANT SELECT, INSERT, UPDATE ON internacion TO perezj_admision;
+
+a) Agregar, modificar o eliminar un paciente. 
+b) Listar consultas y agregar consultas. 
+c) Listar y agregar estudios realizados. 
+d) Listar, agregar, modificar internaciones. 
+
+RRHH 
+
+-- Rol
+CREATE ROLE perezj_rrhh;
+
+-- Usuario
+CREATE USER perezj_userrrhh WITH PASSWORD '1234';
+GRANT perezj_rrhh TO perezj_userrrhh;
+
+-- Permisos
+GRANT USAGE ON SCHEMA public TO perezj_rrhh;
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON empleado TO perezj_rrhh;
+GRANT SELECT, UPDATE ON especialidad TO perezj_rrhh;
+GRANT SELECT, UPDATE ON cargo TO perezj_rrhh;
+GRANT SELECT, UPDATE ON trabajan TO perezj_rrhh;
+
+a) Agregar, modificar o eliminar empleados. 
+b) Modificar los datos de los empleados, especialidad, cargo, horarios que cumplen. 
+
+Médicos 
+
+-- Rol
+CREATE ROLE perezj_medicos;
+
+-- Usuario
+CREATE USER perezj_usermedico WITH PASSWORD '1234';
+GRANT perezj_medicos TO perezj_usermedico;
+
+-- Permisos
+GRANT USAGE ON SCHEMA public TO perezj_medicos;
+
+GRANT SELECT, INSERT ON consulta TO perezj_medicos;
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON tratamiento TO perezj_medicos;
+GRANT SELECT, INSERT, UPDATE, DELETE ON diagnostico TO perezj_medicos;
+GRANT SELECT, INSERT, UPDATE, DELETE ON estudio_realizado TO perezj_medicos;
+
+-- Hereda permisos de Informes y Admisión (lectura)
+GRANT perezj_informes TO perezj_medicos;
+GRANT perezj_admision TO perezj_medicos;
+
+a) Agregar consultas. 
+b) Agregar, modificar o eliminar tratamientos. 
+c) Agregar, modificar o eliminar diagnósticos. 
+d) Agregar, modificar o eliminar estudios realizados. 
+e) Puede realizar todas las consultas que se realizan en Informes y Admisión. 
+
+Compras 
+
+-- Rol
+CREATE ROLE perezj_compras;
+
+-- Usuario
+CREATE USER perezj_usercompras WITH PASSWORD '1234';
+GRANT perezj_compras TO perezj_usercompras;
+
+-- Permisos
+GRANT USAGE ON SCHEMA public TO perezj_compras;
+
+GRANT SELECT, INSERT, UPDATE ON compra TO perezj_compras;
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON laboratorio TO perezj_compras;
+GRANT SELECT, INSERT, UPDATE, DELETE ON clasificacion TO perezj_compras;
+GRANT SELECT, INSERT, UPDATE, DELETE ON proveedor TO perezj_compras;
+GRANT SELECT, INSERT, UPDATE, DELETE ON medicamento TO perezj_compras;
+
+a) Listar compras, mostrando proveedores, clasificación y laboratorio de cada insumo adquirido. 
+b) Agregar y modificar compras. 
+c) Agregar laboratorios, clasificaciones, proveedores y medicamentos. 
+d) Modificar laboratorios, clasificaciones, proveedores y medicamentos. 
+e) Eliminar laboratorios, clasificaciones, proveedores y medicamentos. 
+
+Facturación 
+
+-- Rol
+CREATE ROLE perezj_facturacion;
+
+-- Usuarios
+CREATE USER perezj_userfacturacion WITH PASSWORD '1234';
+GRANT perezj_facturacion TO perezj_userfacturacion;
+
+-- Permisos
+GRANT USAGE ON SCHEMA public TO perezj_facturacion;
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON factura TO perezj_facturacion;
+GRANT SELECT, INSERT, UPDATE, DELETE ON pago TO perezj_facturacion;
+
+GRANT SELECT ON paciente TO perezj_facturacion;
+
+
+a) Listar las facturas, mostrando los pacientes. 
+b) Agregar, modificar y eliminar facturas. 
+c) Listar los pagos, mostrando el paciente. 
+d) Agregar modificar y eliminar pagos. 
+
+Mantenimiento 
+
+-- Rol
+CREATE ROLE perezj_mantenimiento;
+
+-- Usuario
+CREATE USER perezj_usermantenimiento WITH PASSWORD '1234';
+GRANT perezj_mantenimiento TO perezj_usermantenimiento;
+
+-- Permisos
+GRANT USAGE ON SCHEMA public TO perezj_mantenimiento;
+
+GRANT SELECT, INSERT ON equipo TO perezj_mantenimiento;
+GRANT SELECT, INSERT ON cama TO perezj_mantenimiento;
+
+GRANT SELECT, INSERT ON mantenimiento_equipo TO perezj_mantenimiento;
+GRANT SELECT, INSERT ON mantenimiento_cama TO perezj_mantenimiento;
+
+GRANT SELECT ON empleado TO perezj_mantenimiento;
+
+a) Listar los equipos y el estado de los mismos. 
+b) Listar las camas y el estado de las mismas. 
+c) Agregar nuevos equipos y camas. 
+d) Asignar empleados en mantenimientos de equipos y camas. 
+
+Sistemas 
+
+-- Rol
+CREATE ROLE perezj_sistemas;
+
+-- Usuario
+CREATE USER perezj_usersistemas WITH PASSWORD '1234';
+GRANT perezj_sistemas TO perezj_usersistemas;
+
+-- Permisos
+GRANT USAGE ON SCHEMA public TO perezj_sistemas;
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON estudio TO perezj_sistemas;
+GRANT SELECT, INSERT, UPDATE, DELETE ON cargo TO perezj_sistemas;
+GRANT SELECT, INSERT, UPDATE, DELETE ON especialidad TO perezj_sistemas;
+GRANT SELECT, INSERT, UPDATE, DELETE ON tipo_estudio TO perezj_sistemas;
+GRANT SELECT, INSERT, UPDATE, DELETE ON consultorio TO perezj_sistemas;
+GRANT SELECT, INSERT, UPDATE, DELETE ON obra_social TO perezj_sistemas;
+GRANT SELECT, INSERT, UPDATE, DELETE ON turno TO perezj_sistemas;
+
+
+a) Agregar, modificar o eliminar estudios. 
+b) Agregar, modificar o eliminar cargos. 
+c) Agregar, modificar o eliminar especialidades. 
+d) Agregar, modificar o eliminar tipos de estudios. 
+e) Agregar, modificar o eliminar consultorios. 
+f) Agregar, modificar o eliminar obras sociales. 
+g) Agregar, modificar o eliminar turnos. 
+h) Listar todas las tablas antes mencionadas. 
+
+Usuario equis 
+
+-- Usuarios
+CREATE USER equis WITH PASSWORD '1234';
+
+-- Asignar Roles
+GRANT perezj_admision TO equis;
+GRANT perezj_medicos TO equis;
+GRANT perezj_mantenimiento TO equis;
+
+-- Ver todos los permisos de equis
+SELECT grantee, table_name, privilege_type
+FROM information_schema.role_table_grants
+WHERE grantee = 'equis';
+
+a) Cree un usuario de nombre “equis” y asígnele los permisos del grupo Admisión, Médicos y 
+Mantenimiento.  
+b) Mediante una consulte muestre TODOS los permisos que tiene el usuario “equis” sobre todas las tablas 
+
+
+Ejercicio nro. 2:  
+Determine e indique con que usuario (de los creados en el ejercicio anterior) se pueden llevar a cabo las 
+siguientes consultas y realice el código SQL que lo resuelva. En el caso que no se pueda realizar la consulta con 
+ninguno de los usuarios creados previamente, indíquelo e igualmente escriba el código SQL de la consulta. 
+a) Muestre el nombre, apellido y la obra social de todos los pacientes (incluso de aquellos que no tienen obra social). 
+
+SELECT pe.nombre, pe.apellido, os.nombre AS obra_social
+FROM paciente pa
+JOIN persona pe ON pa.id_persona = pe.id_persona
+LEFT JOIN obra_social os ON pa.id_obra_social = os.id_obra_social;
+
+b) Liste el nombre, apellido, especialidad y sueldo de todos los empleados que trabajan por la Noche. 
+
+SELECT pe.nombre, pe.apellido, es.nombre AS especialidad, em.sueldo
+FROM empleado em
+JOIN persona pe ON em.id_persona = pe.id_persona
+JOIN especialidad es ON em.id_especialidad = es.id_especialidad
+JOIN trabajan tr ON em.id_empleado = tr.id_empleado
+WHERE tr.turno = 'Noche';
+
+c) Mostrar los tratamientos cuyo número de dosis sea mayor que 4, es decir, el nombre del 
+medicamento, presentación, clasificación y descripción del tratamiento. 
+
+SELECT m.nombre AS medicamento, m.presentacion, cl.nombre AS clasificacion, t.descripcion
+FROM tratamiento t
+JOIN medicamento m ON t.id_medicamento = m.id_medicamento
+JOIN clasificacion cl ON m.id_clasificacion = cl.id_clasificacion
+WHERE t.numero_dosis > 4;
+
+d) Mostrar todas las facturas que han sido pagadas parcialmente. 
+
+SELECT f.id_factura, f.fecha, f.monto_total, f.monto_pagado
+FROM factura f
+WHERE f.monto_pagado > 0 AND f.monto_pagado < f.monto_total;
+
+e) Mostrar todos los pagos realizados por “Sara Rosell”. 
+
+SELECT pa.id_pago, pa.fecha, pa.monto, pe.nombre, pe.apellido
+FROM pago pa
+JOIN paciente p ON pa.id_paciente = p.id_paciente
+JOIN persona pe ON p.id_persona = pe.id_persona
+WHERE pe.nombre = 'Sara' AND pe.apellido = 'Rosell';
+
+f) Mostrar la historia clínica de la paciente “Luna Giralt” (todas las consultas, tratamientos, estudios, internaciones). Ordene los resultados por fecha. El resultado se debe mostrar de la siguiente manera: 
+
+SELECT pe.nombre, pe.apellido, 'Tratamiento' AS tipo, t.fecha, t.descripcion AS cuestion
+FROM tratamiento t
+JOIN paciente pa ON t.id_paciente = pa.id_paciente
+JOIN persona pe ON pa.id_persona = pe.id_persona
+WHERE pe.nombre = 'Luna' AND pe.apellido = 'Giralt'
+
+UNION ALL
+
+SELECT pe.nombre, pe.apellido, 'Consulta' AS tipo, c.fecha, d.descripcion AS cuestion
+FROM consulta c
+JOIN paciente pa ON c.id_paciente = pa.id_paciente
+JOIN persona pe ON pa.id_persona = pe.id_persona
+JOIN diagnostico d ON c.id_consulta = d.id_consulta
+WHERE pe.nombre = 'Luna' AND pe.apellido = 'Giralt'
+
+UNION ALL
+
+SELECT pe.nombre, pe.apellido, 'Internación' AS tipo, i.fecha_ingreso AS fecha, 
+       CONCAT('Alta: ', i.fecha_alta) AS cuestion
+FROM internacion i
+JOIN paciente pa ON i.id_paciente = pa.id_paciente
+JOIN persona pe ON pa.id_persona = pe.id_persona
+WHERE pe.nombre = 'Luna' AND pe.apellido = 'Giralt'
+
+UNION ALL
+
+SELECT pe.nombre, pe.apellido, 'Estudio' AS tipo, e.fecha, e.resultado AS cuestion
+FROM estudio_realizado e
+JOIN paciente pa ON e.id_paciente = pa.id_paciente
+JOIN persona pe ON pa.id_persona = pe.id_persona
+WHERE pe.nombre = 'Luna' AND pe.apellido = 'Giralt'
+
+ORDER BY fecha;
+
+
+g) Agregar un nuevo Laboratorio (206, “LABUNT”, “AV. INDEPENDENCIA 1800”, “54-381-123-4444”). 
+
+INSERT INTO laboratorio (id_laboratorio, nombre, direccion, telefono)
+VALUES (206, 'LABUNT', 'AV. INDEPENDENCIA 1800', '54-381-123-4444');
+
+
+h) Ingresar un equipo a mantenimiento (43, “2021-09-28”, “A la espera de repuestos”, “En reparacion”, null, 26, 460). 
+
+INSERT INTO mantenimiento_equipo (id_equipo, fecha, observacion, estado, fecha_fin, id_empleado, id_mantenimiento)
+VALUES (43, '2021-09-28', 'A la espera de repuestos', 'En reparacion', NULL, 26, 460);
+
+INSERT INTO mantenimiento_equipo (id_equipo, fecha, observacion, estado, fecha_fin, id_empleado, id_mantenimiento)
+VALUES (43, '2021-09-28', 'A la espera de repuestos', 'En reparacion', NULL, 26, 460);
+
+i) El empleado “Santiago Serna” pasa de trabajar por la Mañana a trabajar por la Tarde. 
+
+UPDATE trabajan tr
+SET turno = 'Tarde'
+FROM empleado e
+JOIN persona p ON e.id_persona = p.id_persona
+WHERE tr.id_empleado = e.id_empleado
+  AND p.nombre = 'Santiago'
+  AND p.apellido = 'Serna'
+  AND tr.turno = 'Mañana';
+
+j) Eliminar al proveedor “BIOPLIX”.
+
+DELETE FROM proveedor
+WHERE nombre = 'BIOPLIX';
+
+
+
+Ejercicio nro. 3:  
+Implemente la seguridad a través de esquemas, para ello: 
+a) Cree un nuevo esquema en la base de datos Hospital, con el nombre de “facturacion”. 
+
+CREATE SCHEMA facturacion;
+
+b) Mueva las tablas pago y factura al nuevo esquema “facturacion” (lo puede hacer desde la pestaña general de las propiedades de tabla). 
+-- Esto se hace cambiando el esquema de las tablas. En SQL sería:
+
+ALTER TABLE pago SET SCHEMA facturacion;
+ALTER TABLE factura SET SCHEMA facturacion;
+
+c) Conéctese al servidor con el usuario de facturación y realice nuevamente la consulta E. Explique si la pudo ejecutar y cómo lo hizo.
+
+-- La consulta E era: “Mostrar todos los pagos realizados por ‘Sara Rosell’”.
+Ahora que las tablas están en el esquema facturacion, el usuario perezj_facturacion_user debe referirse a ellas con el prefijo del esquema
+
+SELECT pa.id_pago, pa.fecha, pa.monto, pe.nombre, pe.apellido
+FROM facturacion.pago pa
+JOIN paciente p ON pa.id_paciente = p.id_paciente
+JOIN persona pe ON p.id_persona = pe.id_persona
+WHERE pe.nombre = 'Sara' AND pe.apellido = 'Rosell';
+
+-- Explicación
+- El usuario perezj_facturacion_user tiene permisos de SELECT sobre las tablas pago y factura.
+- Al moverlas al esquema facturacion, debe usarse el nombre calificado (facturacion.pago, facturacion.factura).
+- Si el esquema facturacion se agrega al search_path del usuario, podría omitirse el prefijo y seguir usando pago y factura directamente:
+ALTER ROLE perezj_facturacion_user SET search_path TO facturacion, public;
+
+ALTER ROLE perezj_facturacion_user SET search_path TO facturacion, public;
+
+
+
+
