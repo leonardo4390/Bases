@@ -1,0 +1,527 @@
+-- verificar si una tabla esta en un esquema o no
+\dt
+
+
+-- si no esta en publico, mover a publico por ejemplo
+
+ALTER TABLE facturacion.factura SET SCHEMA public;
+
+-- Ver nivel actual:
+
+SHOW default_transaction_isolation;
+
+-- Cambiar nivel para una transacción:
+
+BEGIN ISOLATION LEVEL SERIALIZABLE;
+
+-- Cambiar nivel por defecto para la sesión:
+
+SET default_transaction_isolation TO 'repeatable read';
+
+
+-- En psql, el autocommit también está activo por defecto. Para simular un modo manual:
+
+sql
+BEGIN;
+-- sentencias aquí
+COMMIT;
+
+-- Ejercicio nro. 1: 
+
+BEGIN;
+
+-- Paso 1: FARMINDUSTRIA (+7%)
+SAVEPOINT sp_farmindustria;
+UPDATE medicamento
+SET precio = precio * 1.07
+WHERE id_clasificacion IN (
+    SELECT id_clasificacion
+    FROM clasificacion
+    WHERE nombre ILIKE 'ANALGESICO%'
+)
+AND id_laboratorio = (
+    SELECT id_laboratorio
+    FROM laboratorio
+    WHERE nombre = 'FARMINDUSTRIA'
+);
+
+-- Paso 2: GRUNENTHAL S.A. (-3.5%)
+SAVEPOINT sp_grunenthal;
+UPDATE medicamento
+SET precio = precio * 0.965
+WHERE id_clasificacion IN (
+    SELECT id_clasificacion
+    FROM clasificacion
+    WHERE nombre ILIKE 'ANALGESICO%'
+)
+AND id_laboratorio = (
+    SELECT id_laboratorio
+    FROM laboratorio
+    WHERE nombre = 'GRUNENTHAL S.A.'
+);
+
+-- Supongamos que detectamos un error aquí:
+ROLLBACK TO sp_grunenthal;  -- volvemos al savepoint y deshacemos solo este paso
+
+-- Paso 3: LABOSINRATO (-2%)
+SAVEPOINT sp_labosinrato;
+UPDATE medicamento
+SET precio = precio * 0.98
+WHERE id_clasificacion IN (
+    SELECT id_clasificacion
+    FROM clasificacion
+    WHERE nombre ILIKE 'ANALGESICO%'
+)
+AND id_laboratorio = (
+    SELECT id_laboratorio
+    FROM laboratorio
+    WHERE nombre = 'LABOSINRATO'
+);
+
+-- Paso 4: Otros laboratorios (+5.5%)
+SAVEPOINT sp_otros;
+UPDATE medicamento
+SET precio = precio * 1.055
+WHERE id_clasificacion IN (
+    SELECT id_clasificacion
+    FROM clasificacion
+    WHERE nombre ILIKE 'ANALGESICO%'
+)
+AND id_laboratorio NOT IN (
+    SELECT id_laboratorio
+    FROM laboratorio
+    WHERE nombre IN ('FARMINDUSTRIA','GRUNENTHAL S.A.','LABOSINRATO')
+);
+
+-- Si todo salió bien:
+COMMIT;
+
+-- Si querés cancelar todo el ejercicio:
+-- ROLLBACK;
+
+-- Ejercicio nro. 2: 
+
+BEGIN;
+
+-- Paso 1: Insertar persona
+
+SAVEPOINT sp_persona;
+INSERT INTO persona (nombre, apellido, dni, fecha_nacimiento, domicilio, telefono)
+VALUES ('Juan', 'Perez', '31722586', '1984-08-20', 'AV. MITRE 643', '54-381-326-1780');
+
+-- Supongamos que detectamos un error en los datos de persona:
+ROLLBACK TO sp_persona;   -- aquí sí se ejecuta, deshaciendo solo este paso
+
+-- Corregimos y volvemos a insertar
+INSERT INTO persona (nombre, apellido, dni, fecha_nacimiento, domicilio, telefono)
+VALUES ('Juan', 'Perez', '31722586', '1984-08-20', 'Av. Mitre 643', '54-381-326-1780');
+
+-- Paso 2: Insertar paciente
+SAVEPOINT sp_paciente;
+INSERT INTO paciente (id_persona, id_obra_social)
+VALUES (
+    (SELECT id_persona FROM persona WHERE dni = '31722586'),
+    (SELECT id_obra_social FROM obra_social WHERE nombre = 'OBRA SOCIAL DE LOCUTORES')
+);
+
+-- Si detectamos error en paciente:
+ROLLBACK TO sp_paciente;
+
+-- Finalmente, si todo está correcto:
+COMMIT;
+
+-- Si queremos cancelar todo el ejercicio:
+-- ROLLBACK;
+
+-- Ejercicio nro. 3:  
+
+BEGIN;
+
+-- a) Registrar estudio realizado
+SAVEPOINT sp_estudio;
+INSERT INTO estudio_realizado (id_paciente, id_empleado, id_equipo, id_tipo_estudio, fecha, resultado, observacion, costo)
+VALUES (
+    (SELECT id_paciente FROM paciente p JOIN persona pe ON p.id_persona = pe.id_persona WHERE pe.dni = '31722586'),
+    (SELECT id_empleado FROM empleado e JOIN persona pe ON e.id_persona = pe.id_persona WHERE pe.nombre='Fanny' AND pe.apellido='Milla'),
+    (SELECT id_equipo FROM equipo WHERE nombre = 'LARINGOSCOPIO'),
+    (SELECT id_tipo_estudio FROM tipo_estudio WHERE nombre = 'ESPIROMETRIA COMPUTADA'),
+    '2025-04-15',
+    'NORMAL',
+    'NO SE OBSERVAN IRREGULARIDADES',
+    3280.00
+);
+
+-- Si hay error en el estudio:
+ROLLBACK TO sp_estudio;
+
+-- b) Registrar internación
+SAVEPOINT sp_internacion;
+INSERT INTO internacion (id_paciente, id_empleado, id_cama, fecha_ingreso)
+VALUES (
+    (SELECT id_paciente FROM paciente p JOIN persona pe ON p.id_persona = pe.id_persona WHERE pe.dni = '31722586'),
+    (SELECT id_empleado FROM empleado e JOIN persona pe ON e.id_persona = pe.id_persona WHERE pe.nombre='Leticia' AND pe.apellido='Izquierdo'),
+    (SELECT id_cama FROM cama WHERE numero = 157),
+    '2025-04-16'
+);
+
+-- Si hay error en la internación:
+ROLLBACK TO sp_internacion;
+
+-- c) Registrar tratamientos
+SAVEPOINT sp_tratamientos;
+
+INSERT INTO tratamiento (id_paciente, id_empleado, nombre, descripcion, dosis, costo, fecha)
+VALUES (
+    (SELECT id_paciente FROM paciente p JOIN persona pe ON p.id_persona = pe.id_persona WHERE pe.dni = '31722586'),
+    (SELECT id_empleado FROM empleado e JOIN persona pe ON e.id_persona = pe.id_persona WHERE pe.nombre='Leticia' AND pe.apellido='Izquierdo'),
+    'AFRIN ADULTOS SOL', 'FRASCO X 15 CC', 1, 1821.79, '2025-04-16'
+);
+
+INSERT INTO tratamiento (id_paciente, id_empleado, nombre, descripcion, dosis, costo, fecha)
+VALUES (
+    (SELECT id_paciente FROM paciente p JOIN persona pe ON p.id_persona = pe.id_persona WHERE pe.dni = '31722586'),
+    (SELECT id_empleado FROM empleado e JOIN persona pe ON e.id_persona = pe.id_persona WHERE pe.nombre='Leticia' AND pe.apellido='Izquierdo'),
+    'NAFAZOL', 'FRASCO X 15 ML', 2, 1850.96, '2025-04-16'
+);
+
+INSERT INTO tratamiento (id_paciente, id_empleado, nombre, descripcion, dosis, costo, fecha)
+VALUES (
+    (SELECT id_paciente FROM paciente p JOIN persona pe ON p.id_persona = pe.id_persona WHERE pe.dni = '31722586'),
+    (SELECT id_empleado FROM empleado e JOIN persona pe ON e.id_persona = pe.id_persona WHERE pe.nombre='Leticia' AND pe.apellido='Izquierdo'),
+    'VIBROCIL GOTAS NASALES', 'FRASCO X 15 CC', 2, 2500.66, '2025-04-16'
+);
+
+-- Si hay error en tratamientos:
+ROLLBACK TO sp_tratamientos;
+
+-- d) Registrar alta de internación
+SAVEPOINT sp_alta;
+UPDATE internacion
+SET fecha_alta = '2025-04-19 11:30:00', costo = 120000.00
+WHERE id_paciente = (
+    SELECT id_paciente FROM paciente p JOIN persona pe ON p.id_persona = pe.id_persona WHERE pe.dni = '31722586'
+)
+AND fecha_ingreso = '2025-04-16';
+
+-- Si hay error en el alta:
+ROLLBACK TO sp_alta;
+
+-- Confirmar todo
+COMMIT;
+
+-- Si queremos cancelar todo el ejercicio:
+-- ROLLBACK;
+
+-- Ejercicio nro. 4:  
+Tenga en cuenta los datos del punto anterior y emita una factura al paciente Perez, Juan con DNI: 31.722.586, con la 
+fecha de hoy por el monto total de todas las intervenciones indicadas en el punto anterior.
+
+
+BEGIN;
+
+-- Paso 1: Crear factura
+SAVEPOINT sp_factura;
+INSERT INTO factura (id_paciente, fecha, monto_total)
+VALUES (
+    (SELECT id_paciente 
+     FROM paciente p 
+     JOIN persona pe ON p.id_persona = pe.id_persona 
+     WHERE pe.dni = '31722586'),
+    CURRENT_DATE,
+    (
+        -- Subconsulta para sumar todos los costos
+        (SELECT SUM(costo) FROM estudio_realizado er 
+         WHERE er.id_paciente = (SELECT id_paciente FROM paciente p JOIN persona pe ON p.id_persona = pe.id_persona WHERE pe.dni = '31722586'))
+        +
+        (SELECT SUM(costo) FROM internacion i 
+         WHERE i.id_paciente = (SELECT id_paciente FROM paciente p JOIN persona pe ON p.id_persona = pe.id_persona WHERE pe.dni = '31722586'))
+        +
+        (SELECT SUM(costo) FROM tratamiento t 
+         WHERE t.id_paciente = (SELECT id_paciente FROM paciente p JOIN persona pe ON p.id_persona = pe.id_persona WHERE pe.dni = '31722586'))
+    )
+);
+
+-- Si hay error en la factura:
+ROLLBACK TO sp_factura;
+
+-- Paso 2: Insertar detalle de factura (ejemplo: estudios, internaciones, tratamientos)
+SAVEPOINT sp_detalle;
+
+-- Estudio
+INSERT INTO detalle_factura (id_factura, concepto, costo)
+VALUES (
+    (SELECT id_factura FROM factura f 
+     WHERE f.id_paciente = (SELECT id_paciente FROM paciente p JOIN persona pe ON p.id_persona = pe.id_persona WHERE pe.dni = '31722586')
+     ORDER BY fecha DESC LIMIT 1),
+    'ESPIROMETRIA COMPUTADA',
+    3280.00
+);
+
+-- Internación
+INSERT INTO detalle_factura (id_factura, concepto, costo)
+VALUES (
+    (SELECT id_factura FROM factura f 
+     WHERE f.id_paciente = (SELECT id_paciente FROM paciente p JOIN persona pe ON p.id_persona = pe.id_persona WHERE pe.dni = '31722586')
+     ORDER BY fecha DESC LIMIT 1),
+    'Internación 3 días',
+    120000.00
+);
+
+-- Tratamientos
+INSERT INTO detalle_factura (id_factura, concepto, costo)
+VALUES (
+    (SELECT id_factura FROM factura f 
+     WHERE f.id_paciente = (SELECT id_paciente FROM paciente p JOIN persona pe ON p.id_persona = pe.id_persona WHERE pe.dni = '31722586')
+     ORDER BY fecha DESC LIMIT 1),
+    'AFRIN ADULTOS SOL',
+    1821.79
+);
+
+INSERT INTO detalle_factura (id_factura, concepto, costo)
+VALUES (
+    (SELECT id_factura FROM factura f 
+     WHERE f.id_paciente = (SELECT id_paciente FROM paciente p JOIN persona pe ON p.id_persona = pe.id_persona WHERE pe.dni = '31722586')
+     ORDER BY fecha DESC LIMIT 1),
+    'NAFAZOL',
+    1850.96
+);
+
+INSERT INTO detalle_factura (id_factura, concepto, costo)
+VALUES (
+    (SELECT id_factura FROM factura f 
+     WHERE f.id_paciente = (SELECT id_paciente FROM paciente p JOIN persona pe ON p.id_persona = pe.id_persona WHERE pe.dni = '31722586')
+     ORDER BY fecha DESC LIMIT 1),
+    'VIBROCIL GOTAS NASALES',
+    2500.66
+);
+
+-- Si hay error en los detalles:
+ROLLBACK TO sp_detalle;
+
+-- Confirmar todo
+COMMIT;
+
+-- Si queremos cancelar todo el ejercicio:
+-- ROLLBACK;
+
+
+-- Ejercicio nro. 5:  
+
+Escenario A (por defecto: READ COMMITTED)
+user_medico:
+
+sql
+SELECT * FROM patologia WHERE id_patologia = 1;
+→ Ve los datos actuales de la patología 1.
+
+user_postgres:
+
+sql
+BEGIN;  -- sin indicar aislamiento, usa READ COMMITTED
+UPDATE patologia SET nombre = 'Apellido' WHERE id_patologia = 1;
+COMMIT;
+user_medico vuelve a consultar:
+
+sql
+SELECT * FROM patologia WHERE id_patologia = 1;
+→ Ahora ve el nombre actualizado (con el apellido).
+
+Nivel de aislamiento: READ COMMITTED (por defecto).
+Anomalía: Lectura no repetible (non-repeatable read). El mismo SELECT devuelve resultados distintos porque otro usuario confirmó cambios en el medio.
+Cómo evitarlo: Usar REPEATABLE READ o SERIALIZABLE para garantizar consistencia en las lecturas dentro de la transacción.
+
+--> ECENARIO B (REPEATABLE READ)
+user_medico:
+
+sql
+BEGIN ISOLATION LEVEL REPEATABLE READ;
+SELECT * FROM patologia WHERE id_patologia = 1;
+→ Ve los datos iniciales de la patología 1.
+
+user_postgres:
+
+sql
+BEGIN;  -- por defecto READ COMMITTED
+UPDATE patologia SET estado = 'Nombre' WHERE id_patologia = 1;
+COMMIT;
+user_medico vuelve a consultar dentro de su transacción:
+
+sql
+SELECT * FROM patologia WHERE id_patologia = 1;
+→ Sigue viendo los datos iniciales, porque en REPEATABLE READ todas las lecturas son consistentes con el estado al inicio de la transacción.
+
+user_postgres consulta:
+
+sql
+SELECT * FROM patologia WHERE id_patologia = 1;
+→ Ve el estado actualizado (con su nombre).
+
+user_medico hace COMMIT y vuelve a consultar:
+
+sql
+COMMIT;
+SELECT * FROM patologia WHERE id_patologia = 1;
+→ Ahora sí ve el estado actualizado.
+
+Nivel de aislamiento: REPEATABLE READ.
+Anomalía evitada: No hay lecturas no repetibles dentro de la transacción del médico.
+Comportamiento: El médico trabajó con una “foto” consistente de los datos hasta que cerró la transacción.
+
+-- Ejercicio 6
+
+BEGIN;
+
+-- 1) DIRECTOR (+25%)
+SAVEPOINT sp_director;
+UPDATE empleado
+SET sueldo = sueldo * 1.25
+WHERE id_cargo = (
+    SELECT id_cargo FROM cargo WHERE nombre = 'DIRECTOR'
+);
+
+-- Verificación: si algún sueldo supera 200000, deshacer
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM empleado e
+        JOIN cargo c ON e.id_cargo = c.id_cargo
+        WHERE c.nombre = 'DIRECTOR' AND e.sueldo > 200000
+    ) THEN
+        RAISE NOTICE 'Rollback DIRECTOR: sueldo > 200000';
+        ROLLBACK TO sp_director;
+    END IF;
+END;
+$$;
+
+-- 2) DIRECTOR AREA OPERATIVA (+20%)
+SAVEPOINT sp_area;
+UPDATE empleado
+SET sueldo = sueldo * 1.20
+WHERE id_cargo = (
+    SELECT id_cargo FROM cargo WHERE nombre = 'DIRECTOR AREA OPERATIVA'
+);
+
+-- Verificación: si algún sueldo supera 110000, deshacer
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM empleado e
+        JOIN cargo c ON e.id_cargo = c.id_cargo
+        WHERE c.nombre = 'DIRECTOR AREA OPERATIVA' AND e.sueldo > 110000
+    ) THEN
+        RAISE NOTICE 'Rollback AREA OPERATIVA: sueldo > 110000';
+        ROLLBACK TO sp_area;
+    END IF;
+END;
+$$;
+
+-- 3) DIRECTOR FISCALIZACION SANITARIA (+15%)
+SAVEPOINT sp_fiscalizacion;
+UPDATE empleado
+SET sueldo = sueldo * 1.15
+WHERE id_cargo = (
+    SELECT id_cargo FROM cargo WHERE nombre = 'DIRECTOR FISCALIZACION SANITARIA'
+);
+
+-- Verificación: si algún sueldo supera 105000, deshacer
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM empleado e
+        JOIN cargo c ON e.id_cargo = c.id_cargo
+        WHERE c.nombre = 'DIRECTOR FISCALIZACION SANITARIA' AND e.sueldo > 105000
+    ) THEN
+        RAISE NOTICE 'Rollback FISCALIZACION: sueldo > 105000';
+        ROLLBACK TO sp_fiscalizacion;
+    END IF;
+END;
+$$;
+
+-- Confirmar todo
+COMMIT;
+
+-- Si queremos cancelar todo el ejercicio:
+-- ROLLBACK;
+
+-- Ejercicio 7
+
+BEGIN;
+
+-- Paso 1: Cambiar turno y aplicar aumento del 30%
+SAVEPOINT sp_turno;
+UPDATE empleado
+SET turno = (SELECT id_turno FROM turno WHERE nombre = 'Domingo Noche'),
+    sueldo = sueldo * 1.30
+WHERE id_persona = (
+    SELECT id_persona FROM persona WHERE nombre = 'Santiago' AND apellido = 'Serna'
+);
+
+-- Verificación: si el sueldo supera 150000, deshacer y aplicar aumento del 20%
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM empleado e
+        JOIN persona p ON e.id_persona = p.id_persona
+        WHERE p.nombre = 'Santiago' AND p.apellido = 'Serna' AND e.sueldo > 150000
+    ) THEN
+        RAISE NOTICE 'Rollback aumento 30%, aplicar 20%';
+        ROLLBACK TO sp_turno;
+
+        -- Reaplicar cambio de turno con aumento del 20%
+        UPDATE empleado
+        SET turno = (SELECT id_turno FROM turno WHERE nombre = 'Domingo Noche'),
+            sueldo = sueldo * 1.20
+        WHERE id_persona = (
+            SELECT id_persona FROM persona WHERE nombre = 'Santiago' AND apellido = 'Serna'
+        );
+    END IF;
+END;
+$$;
+
+-- Confirmar todo
+COMMIT;
+
+-- Si queremos cancelar todo el ejercicio:
+-- ROLLBACK;
+
+-- Ejercicio 8
+
+BEGIN;
+
+-- Paso 1: Crear savepoint antes de eliminar
+SAVEPOINT sp_delete;
+
+-- Paso 2: Intentar eliminar directamente
+DELETE FROM medicamento
+WHERE nombre = 'ACETONA';
+
+-- Paso 3: Si falla por dependencias, retrocedemos y eliminamos primero las referencias
+ROLLBACK TO sp_delete;
+
+-- Eliminar dependencias (ejemplo: recetas, tratamientos, facturas)
+DELETE FROM receta_detalle
+WHERE id_medicamento = (
+    SELECT id_medicamento FROM medicamento WHERE nombre = 'ACETONA'
+);
+
+DELETE FROM tratamiento
+WHERE id_medicamento = (
+    SELECT id_medicamento FROM medicamento WHERE nombre = 'ACETONA'
+);
+
+DELETE FROM detalle_factura
+WHERE id_medicamento = (
+    SELECT id_medicamento FROM medicamento WHERE nombre = 'ACETONA'
+);
+
+-- Paso 4: Reintentar eliminación del medicamento
+DELETE FROM medicamento
+WHERE nombre = 'ACETONA';
+
+-- Confirmar todo
+COMMIT;
+
+-- Si queremos cancelar todo el ejercicio:
+-- ROLLBACK;
+
+
